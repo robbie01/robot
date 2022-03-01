@@ -14,28 +14,28 @@ constexpr float TURNPERCENT = 15.f;
 constexpr float COUNTS_PER_DEGREE = 318.f * AXLETRACK / (180.f * WHEELDIAM);
 
 void pivotTurn(float degrees) {
-  float counts = COUNTS_PER_DEGREE * degrees;
+	float counts = COUNTS_PER_DEGREE * degrees;
 
-  leftMotor.Stop();
-  rightMotor.Stop();
-  leftEncoder.ResetCounts();
-  rightEncoder.ResetCounts();
-  if (degrees > 0) {
-    leftMotor.SetPercent(-TURNPERCENT);
-    rightMotor.SetPercent(TURNPERCENT);
-  } else if (degrees < 0) {
-    counts *= -1.f;
+	leftMotor.Stop();
+	rightMotor.Stop();
+	leftEncoder.ResetCounts();
+	rightEncoder.ResetCounts();
+	if (degrees > 0) {
+		leftMotor.SetPercent(-TURNPERCENT);
+		rightMotor.SetPercent(TURNPERCENT);
+	} else if (degrees < 0) {
+		counts *= -1.f;
 
-    leftMotor.SetPercent(TURNPERCENT);
-    rightMotor.SetPercent(-TURNPERCENT);
-  } // ignore if 0 so neither motor turns on for a split second
-  while (leftEncoder.Counts() + rightEncoder.Counts() < counts);
-  leftMotor.Stop();
-  rightMotor.Stop();
+		leftMotor.SetPercent(TURNPERCENT);
+		rightMotor.SetPercent(-TURNPERCENT);
+	} // ignore if 0 so neither motor turns on for a split second
+	while (leftEncoder.Counts() + rightEncoder.Counts() < counts);
+	leftMotor.Stop();
+	rightMotor.Stop();
 }
 
 int main() {
-    pivotTurn(180.f);
-    return 0;
+	pivotTurn(180.f);
+	return 0;
 }
 
