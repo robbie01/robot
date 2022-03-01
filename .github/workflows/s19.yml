@@ -1,0 +1,28 @@
+name: build the s19
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: download submodule
+      run: git submodule update --init
+    - name: install ARM GCC
+      run: sudo apt-get install -y gcc-arm-none-eabi
+    - name: make
+      run: make
+    - name: Alias s19
+      run: cp Proteus.s19 CODE.S19
+    - name: Archive s19
+      uses: actions/upload-artifact@v2
+      with:
+        name: CODE.S19
+        path: CODE.S19
