@@ -4,6 +4,7 @@ FIRMWARE = fehproteusfirmware
 all:
 ifeq ($(OS), Windows_NT)
 	mingw32-make -C $(FIRMWARE) all TARGET=$(TARGET)
+	mingw32-make -C $(FIRMWARE) deploy TARGET=$(TARGET)
 else
 	make -C $(FIRMWARE) all TARGET=$(TARGET)
 endif
