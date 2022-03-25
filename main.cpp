@@ -7,6 +7,11 @@
 #include <cstdlib>
 #include <cmath>
 
+struct Point {
+    float x;
+    float y;
+};
+
 constexpr float CDS_MARGIN = 0.4f;
 constexpr float CDS_NO_LIGHT = 3.08f;
 constexpr float CDS_RED = 0.5f;
@@ -95,6 +100,11 @@ void turnTo(float heading) {
 	
 	// fine turn w/ RPS
 	while (std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD) {
+        LCD.Clear();
+        LCD.Write("Intended angle: ");
+        LCD.WriteLine(heading);
+        LCD.Write("Current angle: ");
+        LCD.WriteLine(RPS.Heading());
 		pivotTurn(std::copysign(PULSE_ANGLE, heading - RPS.Heading()));
 		Sleep(PULSE_WIDTH);
 	}
@@ -123,10 +133,17 @@ void moveInline(float distance) {
 	fineMoveInline(distance - actualDistance);
 }
 
-void moveTo(float x, float y) {
-	turnTo(180.f*std::atan2(x - RPS.X(), y - RPS.Y())/M_PI);
-	moveInline(pythagoreanDistance(RPS.X(), x, RPS.Y(), y));
+void moveTo(Point pt) {
+    float rads = std::atan2(pt.y - RPS.Y(), pt.x - RPS.X());
+    while (rads < 0) rads += 2*M_PI;
+    while (rads >= 2*M_PI) rads -= 2*M_PI;
+	turnTo(180.f*rads/M_PI);
+	moveInline(pythagoreanDistance(RPS.X(), pt.x, RPS.Y(), pt.y));
 }
+
+const Point BOTTOM_OF_RAMP { 19.f, 21.f };
+const Point TOP_OF_RAMP { 19.f, 41.f };
+const Point BEHIND_BURGER_FLIP { 28.f, 55.f };
 
 int main() {
     RPS.InitializeTouchMenu();
@@ -136,38 +153,16 @@ int main() {
     wheelServo.SetMin(762);
     wheelServo.SetMax(2473);
 
-	LCD.WriteLine("Waiting for light...");
-	while (!isRedLight());
-	LCD.WriteLine("aah! too bright!");
+    LCD.WriteLine("Waiting for light...");
+    while (!isRedLight());
 
-    moveInline(10);
+    coarseMoveInline(40.f, 5.f);
 
-	LCD.WriteLine("Should have moved 10 inches.");
-	LCD.WriteLine("Touch to continue");
+    moveTo(BOTTOM_OF_RAMP);
+    moveTo(TOP_OF_RAMP);
 
-	int lcdX, lcdY;
-	while (!LCD.Touch(&lcdX, &lcdY));
-	while (LCD.Touch(&lcdX, &lcdY));
-
-	LCD.WriteLine("Continuing...");
-
-	float orig = RPS.Heading();
-
-    Sleep(1.0);
-	LCD.WriteLine("Turning to 90 degrees");
-    turnTo(90);
-
-    Sleep(2.0);
-	LCD.WriteLine("Turning to 45 degrees");
-    turnTo(45);
-
-    Sleep(2.0);
-	LCD.WriteLine("Turning to 270 degrees");
-    turnTo(270);
-
-    Sleep(2.0);
-	LCD.WriteLine("Restoring original bearing");
-    turnTo(orig);
-
-	LCD.WriteLine("Goodbye.");
+    moveTo(BEHIND_BURGER_FLIP);
+    turnTo(90.f);
+    coarseMoveInline(40.f, 6.5f);
+    LCD.WriteLine("Goodbye.");
 }
