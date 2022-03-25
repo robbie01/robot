@@ -104,22 +104,28 @@ float pythagoreanDistance(float x1, float y1, float x2, float y2) {
 	return std::sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
 }
 
-constexpr float PULSE_DISTANCE = .25f;
-constexpr float DISTANCE_THRESHOLD = .5f;
-constexpr float PULSE_POWER = 40.f;
-void pulsedMoveForward(float distance) {
+constexpr float PULSE_DISTANCE = .1f;
+constexpr float DISTANCE_THRESHOLD = .25f;
+constexpr float PULSE_POWER = 20.f;
+void fineMoveInline(float distance) {
 	float startingX = RPS.X(), startingY = RPS.Y();
 	while (distance - pythagoreanDistance(startingX, startingY, RPS.X(), RPS.Y()) > DISTANCE_THRESHOLD) {
-		moveForward(PULSE_POWER, PULSE_DISTANCE);
+		coarseMoveInline(PULSE_POWER, PULSE_DISTANCE);
 		Sleep(PULSE_WIDTH);
 	}
 }
 
-void 
+void moveInline(float distance) {
+	float startX = RPS.X(), startY = RPS.Y();
+	coarseMoveInline(40, distance - 1.f);
+	Sleep(PULSE_WIDTH);
+	float actualDistance = pythagoreanDistance(startX, startY, RPS.X(), RPS.Y());
+	fineMoveInline(distance - actualDistance);
+}
 
 void moveTo(float x, float y) {
-	turnTo(std::atan2(x - RPS.X(), y - RPS.Y()));
-
+	turnTo(180.f*std::atan2(x - RPS.X(), y - RPS.Y())/M_PI);
+	moveInline(pythagoreanDistance(RPS.X(), x, RPS.Y(), y));
 }
 
 int main() {
@@ -134,8 +140,7 @@ int main() {
 	while (!isRedLight());
 	LCD.WriteLine("aah! too bright!");
 
-/*
-    pulsedMoveForward(10);
+    moveInline(10);
 
 	LCD.WriteLine("Should have moved 10 inches.");
 	LCD.WriteLine("Touch to continue");
@@ -145,9 +150,6 @@ int main() {
 	while (LCD.Touch(&lcdX, &lcdY));
 
 	LCD.WriteLine("Continuing...");
-*/
-
-	coarseMoveInline(40, 10);
 
 	float orig = RPS.Heading();
 
