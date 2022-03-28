@@ -163,7 +163,40 @@ static const Point &point_from_prompt(const char *prompt) {
     return invalid_pt;
 }
 
+// path to travel up the ramp from start
+static void goUpRampFromStart() {
+    LCD.Clear();
+    LCD.WriteLine("Moving 19 inches...");
+    coarseMoveInline(40, 14.5);
+
+    LCD.WriteLine("Turning 50 degress...");
+    pivotTurn(-45);
+
+    LCD.WriteLine("Moving up the ramp...");
+    coarseMoveInline(40, 35);
+}
+
+static void throwTray(){
+    LCD.WriteLine("\nThrowing tray");
+    Sleep(1000);
+	armServo.SetDegree(90);
+    LCD.WriteLine("Halfway through...");
+    Sleep(1000);
+	armServo.SetDegree(30);
+    Sleep(1000);
+    LCD.WriteLine("Done throwing tray");
+}
+
+static void slideTicketFromStart(){
+    LCD.WriteLine("Starting first slide...");
+    pivotTurn(-45);
+    LCD.WriteLine("Finished first slide.");
+    
+}
+
 int RunCourseModule::run() {
+    wheelServo.TouchCalibrate();
+
     FEHFile *f = SD.FOpen("position.txt", "r");
     int i = nprompts;
     while (i && (SD.FScanf(f, "%f%f%f", &pts[nprompts-i].x, &pts[nprompts-i].y, &pts[nprompts-i].angle) == 3)) --i;
@@ -174,23 +207,28 @@ int RunCourseModule::run() {
 
     RPS.InitializeTouchMenu();
 
-    armServo.SetMin(775);
-    armServo.SetMax(2450);
-    wheelServo.SetMin(762);
-    wheelServo.SetMax(2473);
+    armServo.SetMin(690);
+    armServo.SetMax(2400);
+    wheelServo.SetMin(690);
+    wheelServo.SetMax(2400);
+
+    armServo.SetDegree(30);
+    wheelServo.SetDegree(0);
 
     LCD.WriteLine("Waiting for light...");
     while (!isRedLight());
 
-    coarseMoveInline(40.f, 5.f);
-
-    moveTo(point_from_prompt("Bottom of ramp"));
-    moveTo(point_from_prompt("Top of ramp"));
-
-    moveToWithTurn(point_from_prompt("Behind burger flip"));
-    turnTo(90.f);
-    coarseMoveInline(40.f, 6.5f);
-    LCD.WriteLine("Goodbye.");
+    /* the original RPS-less sequence */
+    goUpRampFromStart();
+    pivotTurn(126);
+    coarseMoveInline(40, 2.25);
+    throwTray();
+    coarseMoveInline(40, -15);
+    pivotTurn(50.5);
+    armServo.SetDegree(5);
+    coarseMoveInline(40, 19.5);
+    slideTicketFromStart();
+    coarseMoveInline(40,-1);
 }
 
 const std::string &RunCourseModule::name() const {
