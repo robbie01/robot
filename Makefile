@@ -7,6 +7,8 @@ ifeq ($(OS), Windows_NT)
 	mingw32-make -C $(FIRMWARE) deploy TARGET=$(TARGET)
 else
 	make -C $(FIRMWARE) all TARGET=$(TARGET)
+	@echo
+	@./copy_to_sd.sh
 endif
 
 clean:
