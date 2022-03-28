@@ -1,1 +1,5 @@
 main.cpp
+calibrate.cpp
+runcourse.cpp
+module.cpp
+strlcpy.c
