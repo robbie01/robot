@@ -3,20 +3,19 @@
 #include <memory>
 
 static const char *prompts[] = {
-//    "Burger flip",
+    "Tray deposit",
     "Behind burger flip",
     "Bottom of ramp",
     "Top of ramp",
-/*    "Sliding ticket",
-    "Behind sliding ticket",
-    "Tray deposit",
+    "Sliding ticket",
+/*    "Behind sliding ticket",
     "Jukebox light",
     "Behind jukebox light",
     "Red jukebox button",
-    "Blue jukebox button",
+    "Blue jukebox button",*/
     "Behind lever 1",
     "Behind lever 2",
-    "Behind lever 3",*/
+    "Behind lever 3",
 };
 
 static constexpr size_t nprompts = sizeof(prompts)/sizeof(prompts[0]);
