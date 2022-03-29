@@ -36,7 +36,7 @@ static DigitalEncoder rightEncoder(FEHIO::P1_7); // declaring input pin
 
 static constexpr float AXLETRACK = 7.86f;
 static constexpr float WHEELDIAM = 2.41f;
-static constexpr float TURNPERCENT = 20.f;
+static constexpr float TURNPERCENT = 30.f;
 static constexpr float CORRECTION_MULTIPLIER = 1.0711f;
 static constexpr float COUNTS_PER_DEGREE = CORRECTION_MULTIPLIER * (318.f * AXLETRACK / (180.F * WHEELDIAM));
 // THEORETICAL COUNT PER DEGREE : 3.085
@@ -224,19 +224,13 @@ float getChangeInHeading(Point initial, Point final) {
 
 static void moveTo(Point pt)
 {
-    LCD.WriteLine("Current coords: ");
-    printPoint();
-    LCD.WriteLine("Moving to: ");
-    printPoint(pt, false);
-    Sleep(2000);
-
-
+    Sleep(PULSE_WIDTH);
     float pivotAngle = getChangeInHeading(rpsToPoint(), pt);
 
 
     LCD.WriteLine("Calculated angle: ");
     LCD.Write(pivotAngle);
-    Sleep(4.0);
+    Sleep(PULSE_WIDTH);
     rpsPivotTurn(pivotAngle);
     moveInline(pythagoreanDistance(rpsToPoint(), pt));
 }
@@ -280,12 +274,12 @@ static Point goUpRampFromStart()
 static void throwTray()
 {
     LCD.WriteLine("\nThrowing tray");
-    Sleep(1000);
-    armServo.SetDegree(90);
+    //Sleep(1000);
+    armServo.SetDegree(110);
     LCD.WriteLine("Halfway through...");
     Sleep(1000);
-    armServo.SetDegree(30);
-    Sleep(1000);
+
+    armServo.SetDegree(60);
     LCD.WriteLine("Done throwing tray");
 }
 
@@ -383,6 +377,62 @@ static void flipCorrectLeverUp(int leverNumber)
     pivotTurn(-turnAngle * 1.06);
 }
 
+static void hitLever() {
+    int lever = RPS.GetIceCream();
+    switch (lever) {
+    case 0:
+        moveToWithTurn(point_from_prompt("Behind lever 0"));
+        break;
+    case 1:
+        moveToWithTurn(point_from_prompt("Behind lever 1"));
+        break;
+    case 2:
+        moveToWithTurn(point_from_prompt("Behind lever 2"));
+        break;
+    }
+    armServo.SetDegree(60);
+    coarseMoveInline(40, lever == 2 ? 6 : 4.5);
+    armServo.SetDegree(120);
+    Sleep(500);
+    armServo.SetDegree(60);
+    coarseMoveInline(40, -6);
+}
+
+static void unhitLever() {
+    int lever = RPS.GetIceCream();
+    switch (lever) {
+    case 0:
+        moveToWithTurn(point_from_prompt("Behind lever 0"));
+        break;
+    case 1:
+        moveToWithTurn(point_from_prompt("Behind lever 1"));
+        break;
+    case 2:
+        moveToWithTurn(point_from_prompt("Behind lever 2"));
+        break;
+    }
+    armServo.SetDegree(180);
+    coarseMoveInline(40, lever == 2 ? 6 : 4.5);
+    armServo.SetDegree(110);
+    Sleep(500);
+    armServo.SetDegree(180);
+    coarseMoveInline(40, -6);
+    armServo.SetDegree(60);
+}
+
+static void slideTicket() {
+    wheelServo.SetDegree(123);
+    //moveToWithTurn(point_from_prompt("Behind sliding ticket"));
+    turnTo(180);
+    coarseMoveInline(40, -11.5);
+    turnTo(270);
+    armServo.SetDegree(0);
+    coarseMoveInline(40, 8);
+    pivotTurn(-45);
+    coarseMoveInline(40, -4);
+    armServo.SetDegree(60);
+}
+
 int RunCourseModule::run()
 {
     LCD.Clear();
@@ -421,41 +471,33 @@ int RunCourseModule::run()
     // move to previously calibrated point
     moveToWithTurn(point_from_prompt("Top of ramp"));
 
-    Sleep(4.0);
-    LCD.Clear();
-    LCD.WriteLine("Expected: ");
-    printPoint(point_from_prompt("Top of ramp"));
-    LCD.WriteLine("Actual: ");
-    printPoint();
-    LCD.WriteLine("Distance: ");
-    LCD.WriteLine(pythagoreanDistance(rpsToPoint(), point_from_prompt("Top of ramp")));
-
 //  ___________________________________START OF TRAY TASK
     // turn towards sink
     coarseMoveInline(40, 4);
-    float sinkAngle=130;
+    float sinkAngle=140;
     turnTo((point_from_prompt("Top of ramp").heading+sinkAngle));
 
     // move forward and throw
-    coarseMoveInline(40, 6);
+    coarseMoveInline(40, 4);
     throwTray();
 
     // go back home
     coarseMoveInline(40, -8);
     moveToWithTurn(point_from_prompt("Top of ramp"));
-    
-
-    Sleep(4.0);
-    LCD.Clear();
-    LCD.WriteLine("Expected: ");
-    printPoint(point_from_prompt("Top of ramp"));
-    LCD.WriteLine("Actual: ");
-    printPoint();
-    LCD.WriteLine("Distance: ");
-    LCD.WriteLine(pythagoreanDistance(rpsToPoint(), point_from_prompt("Top of ramp")));
 
 
     // /_______________________END OF TRAY TASK
+
+    // ice cream lever task ? ? 
+    hitLever();
+    double leverTime = TimeNow();
+    moveToWithTurn(point_from_prompt("Top of ramp"));
+
+    slideTicket();
+    moveToWithTurn(point_from_prompt("Top of ramp"));
+
+    while (TimeNow() - leverTime < 7.0);
+    unhitLever();
 
 
     // LCD.WriteLine("Turning 50 degress...");

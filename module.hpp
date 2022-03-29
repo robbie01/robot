@@ -7,16 +7,16 @@ static const std::vector<const char*> prompts = {
 //    "Behind burger flip",
 //    "Bottom of ramp",
   "Top of ramp",
-//    "Behind sliding ticket",
+    "Behind sliding ticket",
 //    "Sliding ticket",
 /*    "Jukebox light",
     "Behind jukebox light",
     "Red jukebox button",
     "Blue jukebox button",*/
 //    "Behind levers",
-//    "Behind lever 1",
-/*    "Behind lever 2",
-    "Behind lever 3",*/
+    "Behind lever 0",
+    "Behind lever 1",
+    "Behind lever 2",
 };
 
 static const size_t nprompts = prompts.size();
