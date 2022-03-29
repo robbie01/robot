@@ -132,17 +132,45 @@ static void fineMoveInline(float distance) {
 
 static void moveInline(float distance) {
 	float startX = RPS.X(), startY = RPS.Y();
-	coarseMoveInline(40, distance - 1.f);
+	coarseMoveInline(40, distance - 1.5f);
 	Sleep(PULSE_WIDTH);
 	float actualDistance = pythagoreanDistance(startX, startY, RPS.X(), RPS.Y());
 	fineMoveInline(distance - actualDistance);
 }
 
+static void printPoint(Point pt, bool printHeading=true){
+    LCD.Write("X:");
+    LCD.Write(pt.x);
+    LCD.Write("\tY:");
+    LCD.WriteLine(pt.y);
+    if(printHeading){
+        LCD.Write("Heading: ");
+        LCD.WriteLine(pt.angle);
+    }
+}
+
+static Point rpsToPoint() {
+    return { RPS.X(), RPS.Y(), RPS.Heading() };
+}
+
+static void printPoint() {
+    printPoint(rpsToPoint());
+}
+
 static void moveTo(Point pt) {
+    LCD.WriteLine("Current coords: ");
+    printPoint();
+    LCD.WriteLine("Moving to: ");
+    printPoint(pt, false);
+    Sleep(2000);
+
     float rads = std::atan2(pt.y - RPS.Y(), pt.x - RPS.X());
     while (rads < 0) rads += 2*M_PI;
     while (rads >= 2*M_PI) rads -= 2*M_PI;
-	turnTo(180.f*rads/M_PI);
+    float calculatedAngle=180.f*rads/M_PI;
+    LCD.WriteLine("Calculated angle: ");
+    LCD.Write(calculatedAngle);
+	turnTo(calculatedAngle);
 	moveInline(pythagoreanDistance(RPS.X(), pt.x, RPS.Y(), pt.y));
 }
 
@@ -151,7 +179,7 @@ static void moveToWithTurn(Point pt) {
     turnTo(pt.angle);
 }
 
-static Point pts[nprompts];
+static std::vector<Point> pts;
 static const Point invalid_pt = { -2.f, -2.f, -2.f };
 
 static const Point &point_from_prompt(const char *prompt) {
@@ -164,7 +192,7 @@ static const Point &point_from_prompt(const char *prompt) {
 }
 
 // path to travel up the ramp from start
-static void goUpRampFromStart() {
+static Point goUpRampFromStart() {
     LCD.Clear();
     LCD.WriteLine("Moving 19 inches...");
     coarseMoveInline(40, 14.5);
@@ -194,10 +222,98 @@ static void slideTicketFromStart(){
     
 }
 
+static void flipLeverDown(){
+    armServo.SetDegree(100);
+    Sleep(0.5);
+    armServo.SetDegree(60);
+}
+
+static void flipLeverUp(){
+    armServo.SetDegree(60);
+    Sleep(0.5);
+    armServo.SetDegree(100);
+}
+static void setArmNeutral(){
+    armServo.SetDegree(75);
+}
+
+
+static void flipCorrectLeverDown(int leverNumber)
+{
+    float moveDistance, turnAngle;
+    switch(leverNumber){
+        case 0:
+            moveDistance=7.5;
+            turnAngle=43;
+            break;
+        case 1:
+            turnAngle=30;
+            moveDistance=7.0;
+            break;
+        case 2:
+            turnAngle=13;
+            moveDistance=8.0;
+            break;
+        default:
+            moveDistance=0;
+            break;
+
+    }
+
+    pivotTurn(turnAngle);
+
+    armServo.SetDegree(40);
+    
+    coarseMoveInline(30,moveDistance);
+
+    flipLeverDown();
+
+    
+    coarseMoveInline(30,-moveDistance);
+}
+
+static void flipCorrectLeverUp(int leverNumber)
+{
+    float moveDistance, turnAngle;
+    switch(leverNumber){
+        case 0:
+            moveDistance=7.5;
+            turnAngle=43;
+            break;
+        case 1:
+            turnAngle=30;
+            moveDistance=7.0;
+            break;
+        case 2:
+            turnAngle=13;
+            moveDistance=8.0;
+            break;
+        default:
+            moveDistance=0;
+            break;
+
+    }
+
+    pivotTurn(turnAngle);
+
+    armServo.SetDegree(120);
+
+    coarseMoveInline(30,moveDistance);
+
+    armServo.SetDegree(80);
+    Sleep(0.5);
+
+    coarseMoveInline(30,-moveDistance);
+    
+
+    pivotTurn(-turnAngle*1.06);
+}
+
 int RunCourseModule::run() {
-    wheelServo.TouchCalibrate();
+    LCD.Clear();
 
     FEHFile *f = SD.FOpen("position.txt", "r");
+    for (int i = 0; i < nprompts; ++i) pts.push_back(Point{0, 0, 0});
     int i = nprompts;
     while (i && (SD.FScanf(f, "%f%f%f", &pts[nprompts-i].x, &pts[nprompts-i].y, &pts[nprompts-i].angle) == 3)) --i;
     if (i > 0) {
@@ -207,28 +323,58 @@ int RunCourseModule::run() {
 
     RPS.InitializeTouchMenu();
 
-    armServo.SetMin(690);
-    armServo.SetMax(2400);
+    armServo.SetMin(775);
+    armServo.SetMax(2450);
     wheelServo.SetMin(690);
     wheelServo.SetMax(2400);
 
     armServo.SetDegree(30);
-    wheelServo.SetDegree(0);
+    wheelServo.SetDegree(63);
 
     LCD.WriteLine("Waiting for light...");
     while (!isRedLight());
 
     /* the original RPS-less sequence */
     goUpRampFromStart();
+
+    LCD.WriteLine("Saving this point...");
+    Sleep(3.0);
+    Point savedRampPt = rpsToPoint();
+
     pivotTurn(126);
     coarseMoveInline(40, 2.25);
     throwTray();
     coarseMoveInline(40, -15);
-    pivotTurn(50.5);
+
+    moveToWithTurn(savedRampPt);
+
+    flipCorrectLeverDown(RPS.GetIceCream());
+
+    Sleep(1.0);
+
+    moveToWithTurn(savedRampPt);
+
+    // flipCorrectLeverUp(RPS.GetIceCream());
+
+/*
+    double leverTime = TimeNow();
+
+
+    moveToWithTurn(point_from_prompt("Behind sliding ticket"));
     armServo.SetDegree(5);
-    coarseMoveInline(40, 19.5);
+    wheelServo.SetDegree(135);
+    moveTo(point_from_prompt("Sliding ticket"));
     slideTicketFromStart();
-    coarseMoveInline(40,-1);
+
+    while(TimeNow() - leverTime < 7.0);
+
+    Sleep(3.0);
+    while(true){
+        LCD.Write(cds.Value());
+        Sleep(100);
+        LCD.Clear();
+    }
+    */
 }
 
 const std::string &RunCourseModule::name() const {
