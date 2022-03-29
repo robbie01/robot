@@ -2,20 +2,20 @@
 #include <string>
 #include <memory>
 
-static std::vector<const char*> prompts = {
+static const std::vector<const char*> prompts = {
 //    "Tray deposit",
 //    "Behind burger flip",
 //    "Bottom of ramp",
-//    "Top of ramp",
+  "Top of ramp",
 //    "Behind sliding ticket",
 //    "Sliding ticket",
 /*    "Jukebox light",
     "Behind jukebox light",
     "Red jukebox button",
     "Blue jukebox button",*/
-/*    "Behind levers",
-    "Behind lever 1",
-    "Behind lever 2",
+//    "Behind levers",
+//    "Behind lever 1",
+/*    "Behind lever 2",
     "Behind lever 3",*/
 };
 
