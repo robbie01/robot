@@ -32,5 +32,6 @@ int main() {
     }
 
 run:
+    LCD.Clear();
     return module_provider.vec()[idx]->run();
 }

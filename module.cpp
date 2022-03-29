@@ -12,6 +12,7 @@ void ModuleProvider::register_module(std::unique_ptr<Module> &&fac) {
 ModuleProvider::ModuleProvider() {
     register_module(std::make_unique<RunCourseModule>());
     register_module(std::make_unique<CalibrationModule>());
+    register_module(std::make_unique<CDSModule>());
 }
 
 const std::vector<std::unique_ptr<Module>> &ModuleProvider::vec() {

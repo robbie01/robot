@@ -2,23 +2,24 @@
 #include <string>
 #include <memory>
 
-static const char *prompts[] = {
-    "Tray deposit",
-    "Behind burger flip",
-    "Bottom of ramp",
-    "Top of ramp",
-    "Sliding ticket",
-/*    "Behind sliding ticket",
-    "Jukebox light",
+static std::vector<const char*> prompts = {
+//    "Tray deposit",
+//    "Behind burger flip",
+//    "Bottom of ramp",
+//    "Top of ramp",
+//    "Behind sliding ticket",
+//    "Sliding ticket",
+/*    "Jukebox light",
     "Behind jukebox light",
     "Red jukebox button",
     "Blue jukebox button",*/
+/*    "Behind levers",
     "Behind lever 1",
     "Behind lever 2",
-    "Behind lever 3",
+    "Behind lever 3",*/
 };
 
-static constexpr size_t nprompts = sizeof(prompts)/sizeof(prompts[0]);
+static const size_t nprompts = prompts.size();
 
 class ModuleProvider;
 
@@ -51,6 +52,12 @@ public:
 };
 
 class CalibrationModule : public Module {
+public:
+    const std::string &name() const;
+    int run();
+};
+
+class CDSModule : public Module {
 public:
     const std::string &name() const;
     int run();
