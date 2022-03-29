@@ -16,6 +16,8 @@ int CalibrationModule::run() {
 	FEHFile *f = SD.FOpen("position.txt", "w");
     Sleep(1000);
 
+    LCD.ClearBuffer();
+
 	int lcdX, lcdY;
 
     for (const char *prompt : prompts) {
