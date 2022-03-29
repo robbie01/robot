@@ -34,7 +34,7 @@ int CalibrationModule::run() {
             LCD.Write("\nTouch screen to record\ncoords for ");
             LCD.WriteLine(prompt);
 
-            if (LCD.Touch(&lcdX, &lcdY)) {
+            if (LCD.Touch(&lcdX, &lcdY) && x > 0 && y > 0 && angle > 0) {
                 SD.FPrintf(f, "%f\t%f\t%f\n", x, y, angle);
                 break;
             }
