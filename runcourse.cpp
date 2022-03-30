@@ -158,16 +158,16 @@ static float pythagoreanDistance(Point a, Point b) {
     return pythagoreanDistance(a.x, a.y, b.x, b.y);
 }
 
-static constexpr float PULSE_DISTANCE = .1f;
-static constexpr float DISTANCE_THRESHOLD = .25f;
+static constexpr float PULSE_DISTANCE = .05f;
+static constexpr float DISTANCE_THRESHOLD = .15f;
 static constexpr float PULSE_POWER = 20.f;
-static void fineMoveInline(float distance)
+static void fineMoveInline(float distance, float signedDistance)
 {
     Point starting = rpsToPoint();
     Sleep(PULSE_WIDTH);
     while (distance - pythagoreanDistance(starting, rpsToPoint()) > DISTANCE_THRESHOLD)
     {
-        coarseMoveInline(PULSE_POWER, PULSE_DISTANCE);
+        coarseMoveInline(PULSE_POWER, std::copysign(PULSE_DISTANCE, signedDistance));
         Sleep(PULSE_WIDTH);
     }
 }
@@ -175,10 +175,10 @@ static void fineMoveInline(float distance)
 static void moveInline(float distance)
 {
     Point starting = rpsToPoint();
-    coarseMoveInline(40, distance - 1.5f);
+    coarseMoveInline(40, std::copysign(std::fabs(distance - .75f), distance));
     Sleep(PULSE_WIDTH);
     float actualDistance = pythagoreanDistance(starting, rpsToPoint());
-    fineMoveInline(distance - actualDistance);
+    fineMoveInline(std::fabs(distance) - actualDistance, distance);
 }
 
 static void printPoint(Point pt, bool printHeading = true)
@@ -199,12 +199,12 @@ static void printPoint()
     printPoint(rpsToPoint());
 }
 
-float getDegrees(float radians) {
+static float getDegrees(float radians) {
     return 180.0 * radians / M_PI;
 
 }
 
-float getHeadingToPoint(Point initial, Point final){
+static float getHeadingToPoint(Point initial, Point final){
 
     float xDiff = final.x - initial.x;
     float yDiff = final.y - initial.y;
@@ -214,7 +214,7 @@ float getHeadingToPoint(Point initial, Point final){
     return angle;
 }
 
-float getChangeInHeading(Point initial, Point final) {
+static float getChangeInHeading(Point initial, Point final) {
     
     float angle = getHeadingToPoint(initial, final);
     
@@ -225,14 +225,18 @@ float getChangeInHeading(Point initial, Point final) {
 static void moveTo(Point pt)
 {
     Sleep(PULSE_WIDTH);
-    float pivotAngle = getChangeInHeading(rpsToPoint(), pt);
-
-
-    LCD.WriteLine("Calculated angle: ");
-    LCD.Write(pivotAngle);
-    Sleep(PULSE_WIDTH);
-    rpsPivotTurn(pivotAngle);
-    moveInline(pythagoreanDistance(rpsToPoint(), pt));
+    float angle = getChangeInHeading(rpsToPoint(), pt);
+    //if (std::fabs(angle) < 90) {
+        rpsPivotTurn(angle);
+        Sleep(PULSE_WIDTH);
+        moveInline(pythagoreanDistance(rpsToPoint(), pt));
+    /*} else {
+        if (angle < 0) angle += 180;
+        else angle -= 180;
+        rpsPivotTurn(angle);
+        Sleep(PULSE_WIDTH);
+        moveInline(-pythagoreanDistance(rpsToPoint(), pt));
+    }*/
 }
 
 static void moveToWithTurn(Point pt){
@@ -255,22 +259,6 @@ static const Point &point_from_prompt(const char *prompt)
     return invalid_pt;
 }
 
-// path to travel up the ramp from start
-static Point goUpRampFromStart()
-{
-    LCD.Clear();
-    LCD.WriteLine("Moving 19 inches...");
-    coarseMoveInline(40, 14.5);
-
-    LCD.WriteLine("Turning 50 degress...");
-    pivotTurn(-45);
-
-    LCD.WriteLine("Moving up the ramp...");
-    coarseMoveInline(40, 35);
-
-    return rpsToPoint();
-}
-
 static void throwTray()
 {
     LCD.WriteLine("\nThrowing tray");
@@ -289,94 +277,6 @@ static void slideTicketFromStart()
     pivotTurn(-45);
     LCD.WriteLine("Finished first slide.");
 }
-
-static void flipLeverDown()
-{
-    armServo.SetDegree(100);
-    Sleep(0.5);
-    armServo.SetDegree(60);
-}
-
-static void flipLeverUp()
-{
-    armServo.SetDegree(60);
-    Sleep(0.5);
-    armServo.SetDegree(100);
-}
-static void setArmNeutral()
-{
-    armServo.SetDegree(75);
-}
-
-static void flipCorrectLeverDown(int leverNumber)
-{
-    float moveDistance, turnAngle;
-    switch (leverNumber)
-    {
-    case 0:
-        moveDistance = 7.5;
-        turnAngle = 36;
-        break;
-    case 1:
-        turnAngle = 30;
-        moveDistance = 7.0;
-        break;
-    case 2:
-        turnAngle = 7;
-        moveDistance = 8.0;
-        break;
-    default:
-        moveDistance = 0;
-        break;
-    }
-
-    pivotTurn(turnAngle);
-
-    armServo.SetDegree(40);
-
-    coarseMoveInline(30, moveDistance);
-
-    flipLeverDown();
-
-    coarseMoveInline(30, -moveDistance);
-}
-
-static void flipCorrectLeverUp(int leverNumber)
-{
-    float moveDistance, turnAngle;
-    switch (leverNumber)
-    {
-    case 0:
-        moveDistance = 7.5;
-        turnAngle = 36;
-        break;
-    case 1:
-        turnAngle = 30;
-        moveDistance = 7.0;
-        break;
-    case 2:
-        turnAngle = 7;
-        moveDistance = 8.0;
-        break;
-    default:
-        moveDistance = 0;
-        break;
-    }
-
-    pivotTurn(turnAngle);
-
-    armServo.SetDegree(120);
-
-    coarseMoveInline(30, moveDistance);
-
-    armServo.SetDegree(80);
-    Sleep(0.5);
-
-    coarseMoveInline(30, -moveDistance);
-
-    pivotTurn(-turnAngle * 1.06);
-}
-
 static void hitLever() {
     int lever = RPS.GetIceCream();
     switch (lever) {
@@ -390,12 +290,16 @@ static void hitLever() {
         moveToWithTurn(point_from_prompt("Behind lever 2"));
         break;
     }
+    float angles[] = { -5, 10, 0 }, *a = angles;
     armServo.SetDegree(60);
-    coarseMoveInline(40, lever == 2 ? 6 : 4.5);
-    armServo.SetDegree(120);
-    Sleep(500);
-    armServo.SetDegree(60);
-    coarseMoveInline(40, -6);
+    coarseMoveInline(40, 7);
+    do {
+        armServo.SetDegree(120);
+        Sleep(500);
+        armServo.SetDegree(60);
+        pivotTurn(*a);
+    } while (*a++ != 0);
+    coarseMoveInline(40, -7);
 }
 
 static void unhitLever() {
@@ -411,18 +315,21 @@ static void unhitLever() {
         moveToWithTurn(point_from_prompt("Behind lever 2"));
         break;
     }
-    armServo.SetDegree(180);
-    coarseMoveInline(40, lever == 2 ? 6 : 4.5);
-    armServo.SetDegree(110);
-    Sleep(500);
-    armServo.SetDegree(180);
-    coarseMoveInline(40, -6);
+    float angles[] = { -5, 10, 0 }, *a = angles;
+    armServo.SetDegree(170);
+    coarseMoveInline(40, 7);
+    do {
+        armServo.SetDegree(100);
+        Sleep(500);
+        armServo.SetDegree(170);
+        pivotTurn(*a);
+    } while (*a++ != 0);
     armServo.SetDegree(60);
+    coarseMoveInline(40, -7);
 }
 
 static void slideTicket() {
     wheelServo.SetDegree(123);
-    //moveToWithTurn(point_from_prompt("Behind sliding ticket"));
     turnTo(180);
     coarseMoveInline(40, -11.5);
     turnTo(270);
@@ -431,6 +338,21 @@ static void slideTicket() {
     pivotTurn(-45);
     coarseMoveInline(40, -4);
     armServo.SetDegree(60);
+    wheelServo.SetDegree(60);
+}
+
+static void flipBurger() {
+    moveToWithTurn(point_from_prompt("Behind burger flip"));
+    wheelServo.SetDegree(60);
+    coarseMoveInline(40, 2);
+    for (int i = 1; i <= 10; ++i) {
+        wheelServo.SetDegree((153.f-60.f)*i/10.f+60.f);
+        Sleep(100);
+    }
+    Sleep(500);
+    wheelServo.SetDegree(60);
+    Sleep(500);
+    coarseMoveInline(40, -2);
 }
 
 int RunCourseModule::run()
@@ -471,11 +393,10 @@ int RunCourseModule::run()
     // move to previously calibrated point
     moveToWithTurn(point_from_prompt("Top of ramp"));
 
-//  ___________________________________START OF TRAY TASK
+    //  ___________________________________START OF TRAY TASK
     // turn towards sink
     coarseMoveInline(40, 4);
-    float sinkAngle=140;
-    turnTo((point_from_prompt("Top of ramp").heading+sinkAngle));
+    turnTo(230);
 
     // move forward and throw
     coarseMoveInline(40, 4);
@@ -483,89 +404,32 @@ int RunCourseModule::run()
 
     // go back home
     coarseMoveInline(40, -8);
-    moveToWithTurn(point_from_prompt("Top of ramp"));
+    moveTo(point_from_prompt("Top of ramp"));
+    //  _______________________END OF TRAY TASK
 
-
-    // /_______________________END OF TRAY TASK
-
-    // ice cream lever task ? ? 
+    // ice cream lever task begin
     hitLever();
     double leverTime = TimeNow();
-    moveToWithTurn(point_from_prompt("Top of ramp"));
+    moveTo(point_from_prompt("Top of ramp"));
 
+    // sliding ticket task begin
     slideTicket();
-    moveToWithTurn(point_from_prompt("Top of ramp"));
+    moveTo(point_from_prompt("Top of ramp"));
+    // sliding ticket task end
+
+    // burger flip task begin
+    flipBurger();
+    moveTo(point_from_prompt("Top of ramp"));
+    // burger flip task end
 
     while (TimeNow() - leverTime < 7.0);
     unhitLever();
+    // ice cream lever task end
 
+    moveTo(point_from_prompt("Top of ramp"));
+    moveTo(point_from_prompt("Bottom of ramp"));
 
-    // LCD.WriteLine("Turning 50 degress...");
-    // pivotTurn(-45);
-    // LCD.WriteLine("Saving this point...");
-    // Sleep(3.0);
-    // Point savedRampPt = rpsToPoint();
-
-    // pivotTurn(116);
-    // coarseMoveInline(40, 2.5);
-    // throwTray();
-    // coarseMoveInline(40, -10);
-
-    // moveTo(savedRampPt);
-    // turnTo(savedRampPt.heading);
-    // Sleep(1.0);
-    // LCD.Clear();
-    // LCD.WriteLine("Expected: ");
-    // printPoint();
-    // LCD.WriteLine("Actual: ");
-    // printPoint(savedRampPt);
-    // LCD.WriteLine("Distance: ");
-    // LCD.WriteLine(pythagoreanDistance(rpsToPoint(), savedRampPt));
-    
-    // Sleep(4.0);
-    // LCD.Clear();
-    // LCD.Write("Flipping down lever ");
-    // LCD.Write(RPS.GetIceCream());
-    // Sleep(3.0);
-    // flipCorrectLeverDown(RPS.GetIceCream());
-
-    // Sleep(2.0);
-
-    // moveTo(Point{savedRampPt.x-1, savedRampPt.y + 1, savedRampPt.heading});
-    // turnTo(savedRampPt.heading);
-    // Sleep(200);
-    // LCD.Clear();
-    // LCD.WriteLine("Expected: ");
-    // printPoint();
-    // LCD.WriteLine("Actual: ");
-    // printPoint(savedRampPt);
-    // LCD.WriteLine("Distance: ");
-    // LCD.WriteLine(pythagoreanDistance(rpsToPoint(), savedRampPt));
-    // Sleep(4.0);
-
-    // Sleep(3.0);
-    // LCD.Write("Flipping up lever ");
-    // LCD.Write(RPS.GetIceCream());
-    // flipCorrectLeverUp(RPS.GetIceCream());
-
-
-// finished levers, going to sliding ticket
-    
-
-
-    LCD.WriteLine("Done.");
-    Sleep(2.0);
-
-
-
-
-
-    // print cds values at the end
-    while(1){
-        LCD.Clear();
-        LCD.WriteLine(cds.Value());
-        Sleep(100);
-    }
+    LCD.WriteLine("Goodbye.");
     return 0;
 }
 

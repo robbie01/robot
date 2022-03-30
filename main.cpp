@@ -14,7 +14,7 @@ int main() {
         strlcpy(labels[i], module_provider.vec()[i]->name().c_str(), 20);
     }
     LCD.Clear();
-    FEHIcon::DrawIconArray(icons, nmodules, 1, 0, 0, 0, 0, labels, 0xFFFFFF, 0xFFFFFF);
+    FEHIcon::DrawIconArray(icons, nmodules, 1, 0, 1, 1, 1, labels, 0xFFFFFF, 0xFFFFFF);
 
     float x, y;
     int idx;
