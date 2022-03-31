@@ -25,7 +25,7 @@ static constexpr float CDS_BLUE = 1.5f;
 
 static AnalogInputPin cds(FEHIO::P0_0);
 
-static FEHMotor leftMotor(FEHMotor::Motor0, 9);
+static FEHMotor leftMotor(FEHMotor::Motor1, 9);
 static FEHMotor rightMotor(FEHMotor::Motor3, 9);
 
 static FEHServo armServo(FEHServo::Servo0);
@@ -108,7 +108,7 @@ static void pivotTurn(float degrees)
 static constexpr int PULSE_WIDTH = 200;
 
 static constexpr float PULSE_ANGLE = .5f;
-static constexpr float HEADING_THRESHOLD_COARSE = 5.f;
+static constexpr float HEADING_THRESHOLD_COARSE = 10.f;
 static constexpr float HEADING_THRESHOLD = 1.f;
 static void turnTo(float heading)
 {
@@ -264,7 +264,7 @@ static void hitLever() {
         moveToWithTurn(point_from_prompt("Behind lever 2"));
         break;
     }
-    float angles[] = { -5, 10, 0 }, *a = angles;
+    float angles[] = { -8, 16, 0 }, *a = angles;
     armServo.SetDegree(60);
     coarseMoveInline(40, 6);
     do {
@@ -290,7 +290,7 @@ static void unhitLever() {
         moveToWithTurn(point_from_prompt("Behind lever 2"));
         break;
     }
-    float angles[] = { -5, 10, 0 }, *a = angles;
+    float angles[] = { -8, 16, 0 }, *a = angles;
     armServo.SetDegree(170);
     coarseMoveInline(40, 6);
     do {
@@ -318,6 +318,9 @@ static void slideTicket() {
 }
 
 static void flipBurger() {
+    Point x = point_from_prompt("Behind burger flip");
+    x.y -= 4.f;
+    moveTo(x);
     moveToWithTurn(point_from_prompt("Behind burger flip"));
     wheelServo.SetDegree(60);
     coarseMoveInline(40, 4);
@@ -336,17 +339,30 @@ constexpr float CDS_BLU_PCT = (3.07f - 1.85f) / 3.07f;
 
 float cdsNoLight = std::nanf("No light value");
 
+static bool isRedLight();
+
 static void pressJukeboxButton() {
     moveTo(point_from_prompt("Behind jukebox light"));
+    wheelServo.SetDegree(123);
     turnTo(270);
-    coarseMoveInline(40, 2);
+    coarseMoveInline(40, 1);
     Sleep(500);
-    float pct = std::fabs(cds.Value() - cdsNoLight) / cdsNoLight;
-    if (std::fabs(pct-CDS_RED_PCT) < std::fabs(pct-CDS_BLU_PCT)) {
+    //float pct = std::fabs(cds.Value() - cdsNoLight) / cdsNoLight;
+    //if (std::fabs(pct-CDS_RED_PCT) < std::fabs(pct-CDS_BLU_PCT)) {
+    if (isRedLight()) { // HAAAAAX
         LCD.WriteLine("Found a red light");
+        pivotTurn(-45);
+        coarseMoveInline(40, 2);
+        pivotTurn(45);
     } else {
         LCD.WriteLine("Found a blue light");
+        pivotTurn(45);
+        coarseMoveInline(40, 2);
+        pivotTurn(-45);
     }
+    coarseMoveInline(40, 4);
+    Sleep(500);
+    coarseMoveInline(40, -4);
 }
 
 // returns 1 if detects red light, 0 for no or blue light.
@@ -435,7 +451,7 @@ int RunCourseModule::run()
 
     moveToWithTurn(init);
     LCD.WriteLine("Goodbye.");
-    coarseMoveInline(50, -1000000); // FULL FORCE!!!!!!!!!!!!
+    coarseMoveInline(40, -1000000); // FULL FORCE!!!!!!!!!!!!
 
     return 0;
 }
