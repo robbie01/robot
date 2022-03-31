@@ -5,7 +5,7 @@
 #include "module.hpp"
 
 const std::string &CalibrationModule::name() const {
-    static const std::string mod_name("Calibrate to SD card");
+    static const std::string mod_name("Calibrate to SD");
     return mod_name;
 }
 
