@@ -52,11 +52,13 @@ static Point rpsToPoint()
 }
 
 // moves both wheels forward {distance} inches at {percent} motor percent.
-static void coarseMoveInline(int percent, float distance)
+static void coarseMoveInline(int percent, float distance, float timeout = INFINITY)
 {
     // Reset encoder counts
     rightEncoder.ResetCounts();
     leftEncoder.ResetCounts();
+
+    float initTime = TimeNow();
 
     // Set both motors to desired percent
     rightMotor.SetPercent(std::copysign(percent + 1, distance));
@@ -66,7 +68,7 @@ static void coarseMoveInline(int percent, float distance)
 
     // While the average of the left and right encoder is less than counts,
     // keep running motors
-    while ((leftEncoder.Counts() + rightEncoder.Counts()) / 2. < counts)
+    while (((leftEncoder.Counts() + rightEncoder.Counts()) / 2. < counts) && (TimeNow() - initTime < timeout))
         ;
 
     // Turn off motors
@@ -255,18 +257,20 @@ static void hitLever() {
     int lever = RPS.GetIceCream();
     switch (lever) {
     case 0:
-        moveToWithTurn(point_from_prompt("Behind lever 0"));
+    case 2:
+        moveTo(point_from_prompt("Behind lever 0"));
         break;
     case 1:
-        moveToWithTurn(point_from_prompt("Behind lever 1"));
+        moveTo(point_from_prompt("Behind lever 1"));
         break;
-    case 2:
-        moveToWithTurn(point_from_prompt("Behind lever 2"));
-        break;
+    /*case 2:
+        moveTo(point_from_prompt("Behind lever 2"));
+        break;*/
     }
+    turnTo(135);
     float angles[] = { -8, 16, 0 }, *a = angles;
     armServo.SetDegree(60);
-    coarseMoveInline(40, 6);
+    coarseMoveInline(40, 5);
     do {
         armServo.SetDegree(120);
         Sleep(500);
@@ -281,15 +285,17 @@ static void unhitLever() {
     int lever = RPS.GetIceCream();
     switch (lever) {
     case 0:
-        moveToWithTurn(point_from_prompt("Behind lever 0"));
+    case 2:
+        moveTo(point_from_prompt("Behind lever 0"));
         break;
     case 1:
-        moveToWithTurn(point_from_prompt("Behind lever 1"));
+        moveTo(point_from_prompt("Behind lever 1"));
         break;
-    case 2:
-        moveToWithTurn(point_from_prompt("Behind lever 2"));
-        break;
+    /*case 2:
+        moveTo(point_from_prompt("Behind lever 2"));
+        break;*/
     }
+    turnTo(135);
     float angles[] = { -8, 16, 0 }, *a = angles;
     armServo.SetDegree(170);
     coarseMoveInline(40, 6);
@@ -319,11 +325,13 @@ static void slideTicket() {
 
 static void flipBurger() {
     Point x = point_from_prompt("Behind burger flip");
-    x.y -= 4.f;
+    x.y -= 10.f*std::sin(x.heading*M_PI/180.f);
+    x.x -= 10.f*std::cos(x.heading*M_PI/180.f);
     moveTo(x);
     moveToWithTurn(point_from_prompt("Behind burger flip"));
+    //turnTo(90);
     wheelServo.SetDegree(60);
-    coarseMoveInline(40, 4);
+    coarseMoveInline(40, 4, 5);
     for (int i = 1; i <= 10; ++i) {
         wheelServo.SetDegree((153.f-60.f)*i/10.f+60.f);
         Sleep(100);
@@ -407,7 +415,8 @@ int RunCourseModule::run()
     coarseMoveInline(40, 14.5);
 
     // move to previously calibrated point
-    moveToWithTurn(point_from_prompt("Top of ramp"));
+    moveTo(point_from_prompt("Top of ramp"));
+    turnTo(90);
 
     //  ___________________________________START OF TRAY TASK
     // turn towards sink
@@ -420,7 +429,7 @@ int RunCourseModule::run()
 
     // go back home
     coarseMoveInline(40, -8);
-    moveTo(point_from_prompt("Top of ramp"));
+    //moveTo(point_from_prompt("Top of ramp"));
     //  _______________________END OF TRAY TASK
 
     // ice cream lever task begin
@@ -430,12 +439,12 @@ int RunCourseModule::run()
 
     // sliding ticket task begin
     slideTicket();
-    moveTo(point_from_prompt("Top of ramp"));
+    //moveTo(point_from_prompt("Top of ramp"));
     // sliding ticket task end
 
     // burger flip task begin
     flipBurger();
-    moveTo(point_from_prompt("Top of ramp"));
+    //moveTo(point_from_prompt("Top of ramp"));
     // burger flip task end
 
     while (TimeNow() - leverTime < 7.0);
@@ -446,7 +455,7 @@ int RunCourseModule::run()
     moveTo(point_from_prompt("Bottom of ramp"));
 
     // jukebox task begin
-    pressJukeboxButton();
+    //pressJukeboxButton();
     // jukebox task end
 
     moveToWithTurn(init);
