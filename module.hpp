@@ -9,10 +9,7 @@ static const std::vector<const char*> prompts = {
     "Behind lever 1",
     "Behind lever 2",
     "Behind burger flip",
-/*    "Jukebox light",
-    "Behind jukebox light",
-    "Red jukebox button",
-    "Blue jukebox button",*/
+    "Behind jukebox light"
 };
 
 static const size_t nprompts = prompts.size();

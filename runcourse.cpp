@@ -51,12 +51,6 @@ static Point rpsToPoint()
     return {RPS.X(), RPS.Y(), RPS.Heading()};
 }
 
-// returns 1 if detects red light, 0 for no or blue light.
-static bool isRedLight()
-{
-    return std::fabs(cds.Value() - CDS_RED) < CDS_MARGIN;
-}
-
 // moves both wheels forward {distance} inches at {percent} motor percent.
 static void coarseMoveInline(int percent, float distance)
 {
@@ -104,7 +98,7 @@ static void pivotTurn(float degrees)
     }
 
     float startTime = TimeNow();
-    while (/*!flSwitch.Value() && !frSwitch.Value() && */ (leftEncoder.Counts() + rightEncoder.Counts() < counts) && TimeNow() - startTime < 4)
+    while ((leftEncoder.Counts() + rightEncoder.Counts() < counts) && (TimeNow() - startTime < 4))
         ;
 
     leftMotor.Stop();
@@ -114,29 +108,18 @@ static void pivotTurn(float degrees)
 static constexpr int PULSE_WIDTH = 200;
 
 static constexpr float PULSE_ANGLE = .5f;
+static constexpr float HEADING_THRESHOLD_COARSE = 5.f;
 static constexpr float HEADING_THRESHOLD = 1.f;
 static void turnTo(float heading)
 {
+    Sleep(PULSE_WIDTH);
     // coarse turn
-    pivotTurn(heading - RPS.Heading());
-
-    // fine turn w/ RPS
-    while (std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD)
-    {
-        LCD.Clear();
-        LCD.Write("Intended angle: ");
-        LCD.WriteLine(heading);
-        LCD.Write("Current angle: ");
-        LCD.WriteLine(RPS.Heading());
-        pivotTurn(std::copysign(PULSE_ANGLE, heading - RPS.Heading()));
+    while (std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD_COARSE) {
+        pivotTurn(heading - RPS.Heading());
         Sleep(PULSE_WIDTH);
     }
-}
 
-static void rpsPivotTurn(float headingDifference) {
-    float heading = RPS.Heading() + headingDifference;
-    pivotTurn((headingDifference>180)?(headingDifference-360):(headingDifference));
-
+    // fine turn w/ RPS
     while (std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD)
     {
         LCD.Clear();
@@ -225,18 +208,10 @@ static float getChangeInHeading(Point initial, Point final) {
 static void moveTo(Point pt)
 {
     Sleep(PULSE_WIDTH);
-    float angle = getChangeInHeading(rpsToPoint(), pt);
-    //if (std::fabs(angle) < 90) {
-        rpsPivotTurn(angle);
-        Sleep(PULSE_WIDTH);
-        moveInline(pythagoreanDistance(rpsToPoint(), pt));
-    /*} else {
-        if (angle < 0) angle += 180;
-        else angle -= 180;
-        rpsPivotTurn(angle);
-        Sleep(PULSE_WIDTH);
-        moveInline(-pythagoreanDistance(rpsToPoint(), pt));
-    }*/
+    Point init = rpsToPoint();
+    turnTo(getHeadingToPoint(init, pt));
+    Sleep(PULSE_WIDTH);
+    moveInline(pythagoreanDistance(init, pt));
 }
 
 static void moveToWithTurn(Point pt){
@@ -262,10 +237,9 @@ static const Point &point_from_prompt(const char *prompt)
 static void throwTray()
 {
     LCD.WriteLine("\nThrowing tray");
-    //Sleep(1000);
     armServo.SetDegree(110);
     LCD.WriteLine("Halfway through...");
-    Sleep(1000);
+    Sleep(500);
 
     armServo.SetDegree(60);
     LCD.WriteLine("Done throwing tray");
@@ -292,14 +266,15 @@ static void hitLever() {
     }
     float angles[] = { -5, 10, 0 }, *a = angles;
     armServo.SetDegree(60);
-    coarseMoveInline(40, 7);
+    coarseMoveInline(40, 6);
     do {
         armServo.SetDegree(120);
         Sleep(500);
         armServo.SetDegree(60);
         pivotTurn(*a);
+        Sleep(100);
     } while (*a++ != 0);
-    coarseMoveInline(40, -7);
+    coarseMoveInline(40, -6);
 }
 
 static void unhitLever() {
@@ -317,15 +292,16 @@ static void unhitLever() {
     }
     float angles[] = { -5, 10, 0 }, *a = angles;
     armServo.SetDegree(170);
-    coarseMoveInline(40, 7);
+    coarseMoveInline(40, 6);
     do {
         armServo.SetDegree(100);
         Sleep(500);
         armServo.SetDegree(170);
         pivotTurn(*a);
+        Sleep(100);
     } while (*a++ != 0);
+    coarseMoveInline(40, -6);
     armServo.SetDegree(60);
-    coarseMoveInline(40, -7);
 }
 
 static void slideTicket() {
@@ -344,7 +320,7 @@ static void slideTicket() {
 static void flipBurger() {
     moveToWithTurn(point_from_prompt("Behind burger flip"));
     wheelServo.SetDegree(60);
-    coarseMoveInline(40, 2);
+    coarseMoveInline(40, 4);
     for (int i = 1; i <= 10; ++i) {
         wheelServo.SetDegree((153.f-60.f)*i/10.f+60.f);
         Sleep(100);
@@ -352,7 +328,31 @@ static void flipBurger() {
     Sleep(500);
     wheelServo.SetDegree(60);
     Sleep(500);
-    coarseMoveInline(40, -2);
+    coarseMoveInline(40, -4);
+}
+
+constexpr float CDS_RED_PCT = (3.07f - 0.29f) / 3.07f;
+constexpr float CDS_BLU_PCT = (3.07f - 1.85f) / 3.07f;
+
+float cdsNoLight = std::nanf("No light value");
+
+static void pressJukeboxButton() {
+    moveTo(point_from_prompt("Behind jukebox light"));
+    turnTo(270);
+    coarseMoveInline(40, 2);
+    Sleep(500);
+    float pct = std::fabs(cds.Value() - cdsNoLight) / cdsNoLight;
+    if (std::fabs(pct-CDS_RED_PCT) < std::fabs(pct-CDS_BLU_PCT)) {
+        LCD.WriteLine("Found a red light");
+    } else {
+        LCD.WriteLine("Found a blue light");
+    }
+}
+
+// returns 1 if detects red light, 0 for no or blue light.
+static bool isRedLight()
+{
+    return std::fabs(cds.Value() - CDS_RED) < CDS_MARGIN;
 }
 
 int RunCourseModule::run()
@@ -373,6 +373,9 @@ int RunCourseModule::run()
 
     RPS.InitializeTouchMenu();
 
+    Sleep(PULSE_WIDTH);
+    const Point init = rpsToPoint();
+
     armServo.SetMin(775);
     armServo.SetMax(2450);
     wheelServo.SetMin(690);
@@ -382,12 +385,9 @@ int RunCourseModule::run()
     wheelServo.SetDegree(63);
 
     LCD.WriteLine("Waiting for light...");
-    while (!isRedLight())
-        ;
+    while (!isRedLight()) cdsNoLight = cds.Value();
 
     /* the original RPS-less sequence */
-    LCD.Clear();
-    LCD.WriteLine("Moving 19 inches...");
     coarseMoveInline(40, 14.5);
 
     // move to previously calibrated point
@@ -429,7 +429,14 @@ int RunCourseModule::run()
     moveTo(point_from_prompt("Top of ramp"));
     moveTo(point_from_prompt("Bottom of ramp"));
 
+    // jukebox task begin
+    pressJukeboxButton();
+    // jukebox task end
+
+    moveToWithTurn(init);
     LCD.WriteLine("Goodbye.");
+    coarseMoveInline(50, -1000000); // FULL FORCE!!!!!!!!!!!!
+
     return 0;
 }
 
