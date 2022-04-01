@@ -18,7 +18,7 @@ struct Point
     float heading;
 };
 
-static constexpr float CDS_MARGIN = 0.4f;
+static constexpr float CDS_MARGIN = 0.8f;       // changed from 0.4 to read jukebox light
 static constexpr float CDS_NO_LIGHT = 3.08f;
 static constexpr float CDS_RED = 0.5f;
 static constexpr float CDS_BLUE = 1.5f;
@@ -116,13 +116,13 @@ static void turnTo(float heading)
 {
     Sleep(PULSE_WIDTH);
     // coarse turn
-    while (std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD_COARSE) {
+    while (RPS.Heading() >= 0 && std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD_COARSE) {
         pivotTurn(heading - RPS.Heading());
         Sleep(PULSE_WIDTH);
     }
 
     // fine turn w/ RPS
-    while (std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD)
+    while (RPS.Heading() >= 0 && std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD)
     {
         LCD.Clear();
         LCD.Write("Intended angle: ");
@@ -253,6 +253,7 @@ static void slideTicketFromStart()
     pivotTurn(-45);
     LCD.WriteLine("Finished first slide.");
 }
+
 static void hitLever() {
     int lever = RPS.GetIceCream();
     switch (lever) {
@@ -270,7 +271,7 @@ static void hitLever() {
     turnTo(135);
     float angles[] = { -8, 16, 0 }, *a = angles;
     armServo.SetDegree(60);
-    coarseMoveInline(40, 5);
+    coarseMoveInline(40, 6);
     do {
         armServo.SetDegree(120);
         Sleep(500);
@@ -278,7 +279,8 @@ static void hitLever() {
         pivotTurn(*a);
         Sleep(100);
     } while (*a++ != 0);
-    coarseMoveInline(40, -6);
+    do coarseMoveInline(40, -6);
+    while (RPS.Heading() < 0);
 }
 
 static void unhitLever() {
@@ -296,27 +298,32 @@ static void unhitLever() {
         break;*/
     }
     turnTo(135);
-    float angles[] = { -8, 16, 0 }, *a = angles;
+    // float angles[] = { -8,8,8 }, *a = angles;
+    // int angleDelta=8, i=0;
+    
     armServo.SetDegree(170);
+    float angles[] = { -8, 16, 0 }, *a = angles;
+    armServo.SetDegree(60);
     coarseMoveInline(40, 6);
     do {
-        armServo.SetDegree(100);
+        armServo.SetDegree(120);
         Sleep(500);
-        armServo.SetDegree(170);
+        armServo.SetDegree(60);
         pivotTurn(*a);
         Sleep(100);
     } while (*a++ != 0);
-    coarseMoveInline(40, -6);
+    do coarseMoveInline(40, -6);
+    while (RPS.Heading() < 0);
     armServo.SetDegree(60);
 }
 
 static void slideTicket() {
-    wheelServo.SetDegree(123);
+    wheelServo.SetDegree(127);
     turnTo(180);
     coarseMoveInline(40, -11.5);
     turnTo(270);
     armServo.SetDegree(0);
-    coarseMoveInline(40, 8);
+    coarseMoveInline(40, 7.75);
     pivotTurn(-45);
     coarseMoveInline(40, -4);
     armServo.SetDegree(60);
@@ -330,14 +337,15 @@ static void flipBurger() {
     moveTo(x);
     moveToWithTurn(point_from_prompt("Behind burger flip"));
     //turnTo(90);
-    wheelServo.SetDegree(60);
+    int wheelServoVertical=57;
+    wheelServo.SetDegree(wheelServoVertical);
     coarseMoveInline(40, 4, 5);
     for (int i = 1; i <= 10; ++i) {
         wheelServo.SetDegree((153.f-60.f)*i/10.f+60.f);
         Sleep(100);
     }
     Sleep(500);
-    wheelServo.SetDegree(60);
+    wheelServo.SetDegree(wheelServoVertical);
     Sleep(500);
     coarseMoveInline(40, -4);
 }
@@ -350,32 +358,30 @@ float cdsNoLight = std::nanf("No light value");
 static bool isRedLight();
 
 static void pressJukeboxButton() {
-    moveTo(point_from_prompt("Behind jukebox light"));
+    // moveTo(point_from_prompt("Behind jukebox light"));
     wheelServo.SetDegree(123);
-    turnTo(270);
-    coarseMoveInline(40, 1);
-    Sleep(500);
+    // Sleep(500);
     //float pct = std::fabs(cds.Value() - cdsNoLight) / cdsNoLight;
     //if (std::fabs(pct-CDS_RED_PCT) < std::fabs(pct-CDS_BLU_PCT)) {
-    if (isRedLight()) { // HAAAAAX
-        LCD.WriteLine("Found a red light");
-        pivotTurn(-45);
-        coarseMoveInline(40, 2);
-        pivotTurn(45);
+    bool isRed = false;
+    if (isRed) { // HAAAAAX
+        LCD.WriteLine("Found a RED light");
+
     } else {
-        LCD.WriteLine("Found a blue light");
-        pivotTurn(45);
-        coarseMoveInline(40, 2);
-        pivotTurn(-45);
+        LCD.WriteLine("Found a BLUE light");
     }
+
     coarseMoveInline(40, 4);
-    Sleep(500);
-    coarseMoveInline(40, -4);
+    // turn to face correct button
+    turnTo((isRed)?275:90);
+    coarseMoveInline(30,-4, 3);
+    coarseMoveInline(30,4);
 }
 
 // returns 1 if detects red light, 0 for no or blue light.
 static bool isRedLight()
 {
+    Sleep(100);
     return std::fabs(cds.Value() - CDS_RED) < CDS_MARGIN;
 }
 
@@ -395,21 +401,27 @@ int RunCourseModule::run()
         return 1;
     }
 
-    RPS.InitializeTouchMenu();
-
-    Sleep(PULSE_WIDTH);
-    const Point init = rpsToPoint();
-
     armServo.SetMin(775);
     armServo.SetMax(2450);
     wheelServo.SetMin(690);
     wheelServo.SetMax(2400);
 
     armServo.SetDegree(30);
-    wheelServo.SetDegree(63);
+    wheelServo.SetDegree(57);
+
+
+
+    RPS.InitializeTouchMenu();
+
+    Sleep(PULSE_WIDTH);
+    const Point init = rpsToPoint();
+
+
 
     LCD.WriteLine("Waiting for light...");
-    while (!isRedLight()) cdsNoLight = cds.Value();
+    cdsNoLight = cds.Value();
+    float lightTime = TimeNow();
+    while (!isRedLight() && TimeNow() - lightTime < 30.f);
 
     /* the original RPS-less sequence */
     coarseMoveInline(40, 14.5);
@@ -452,10 +464,17 @@ int RunCourseModule::run()
     // ice cream lever task end
 
     moveTo(point_from_prompt("Top of ramp"));
-    moveTo(point_from_prompt("Bottom of ramp"));
+    // moveTo(point_from_prompt("Bottom of ramp"));
+
 
     // jukebox task begin
-    //pressJukeboxButton();
+    Point x = point_from_prompt("On jukebox light");
+    x.y += 2;
+    x.x += 4;
+    moveTo(x);
+
+    moveTo(point_from_prompt("On jukebox light"));
+    pressJukeboxButton();
     // jukebox task end
 
     moveToWithTurn(init);
