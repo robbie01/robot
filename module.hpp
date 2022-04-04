@@ -6,7 +6,7 @@ static const std::vector<const char*> prompts = {
     // "Bottom of ramp",
     "Top of ramp",
     "Behind lever 0",
-    "Behind lever 1",
+    //"Behind lever 1",
     //"Behind lever 2",
     "Behind burger flip",
     "On jukebox light"      // robot faces 180 degrees, CDS is on top of light
