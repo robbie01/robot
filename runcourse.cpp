@@ -110,7 +110,7 @@ static void pivotTurn(float degrees)
 static constexpr int PULSE_WIDTH = 200;
 
 static constexpr float PULSE_ANGLE = .5f;
-static constexpr float HEADING_THRESHOLD_COARSE = 10.f;
+static constexpr float HEADING_THRESHOLD_COARSE = 12.f;
 static constexpr float HEADING_THRESHOLD = 1.f;
 static void turnTo(float heading)
 {
@@ -122,15 +122,17 @@ static void turnTo(float heading)
     }
 
     // fine turn w/ RPS
-    while (RPS.Heading() >= 0 && std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD)
-    {
-        LCD.Clear();
-        LCD.Write("Intended angle: ");
-        LCD.WriteLine(heading);
-        LCD.Write("Current angle: ");
-        LCD.WriteLine(RPS.Heading());
-        pivotTurn(std::copysign(PULSE_ANGLE, heading - RPS.Heading()));
-        Sleep(PULSE_WIDTH);
+    if (std::fabs(RPS.Heading() - 360) > HEADING_THRESHOLD_COARSE && RPS.Heading() > HEADING_THRESHOLD_COARSE) {
+        while (RPS.Heading() >= 0 && std::fabs(RPS.Heading() - heading) > HEADING_THRESHOLD)
+        {
+            LCD.Clear();
+            LCD.Write("Intended angle: ");
+            LCD.WriteLine(heading);
+            LCD.Write("Current angle: ");
+            LCD.WriteLine(RPS.Heading());
+            pivotTurn(std::copysign(PULSE_ANGLE, heading - RPS.Heading()));
+            Sleep(PULSE_WIDTH);
+        }
     }
 }
 
@@ -207,13 +209,21 @@ static float getChangeInHeading(Point initial, Point final) {
     return pivot;
 }
 
-static void moveTo(Point pt)
+static void moveTo(Point pt, bool midCorrect = false)
 {
     Sleep(PULSE_WIDTH);
     Point init = rpsToPoint();
     turnTo(getHeadingToPoint(init, pt));
     Sleep(PULSE_WIDTH);
-    moveInline(pythagoreanDistance(init, pt));
+    if (midCorrect) {
+        moveInline(pythagoreanDistance(init, pt)/2);
+        Sleep(PULSE_WIDTH);
+        turnTo(getHeadingToPoint(rpsToPoint(), pt));
+        Sleep(PULSE_WIDTH);
+        moveInline(pythagoreanDistance(rpsToPoint(), pt));
+    } else {
+        moveInline(pythagoreanDistance(init, pt));
+    }
 }
 
 static void moveToWithTurn(Point pt){
@@ -247,14 +257,8 @@ static void throwTray()
     LCD.WriteLine("Done throwing tray");
 }
 
-static void slideTicketFromStart()
-{
-    LCD.WriteLine("Starting first slide...");
-    pivotTurn(-45);
-    LCD.WriteLine("Finished first slide.");
-}
-
 static void hitLever() {
+    moveTo(point_from_prompt("Behind lever 0"));
     moveToWithTurn(point_from_prompt("Behind lever 0"));
     float angles[] = { -8, 16, 0 }, *a = angles;
     armServo.SetDegree(60);
@@ -267,7 +271,7 @@ static void hitLever() {
         pivotTurn(*a);
     } while (*a++ != 0);
 
-    do coarseMoveInline(40, -8);
+    do coarseMoveInline(50, -8);
     while (RPS.Heading() < 0);
 }
 
@@ -278,22 +282,23 @@ static void unhitLever() {
     armServo.SetDegree(170);
     coarseMoveInline(40, 6.75);
     do {
-        armServo.SetDegree(100);
+        armServo.SetDegree(80);
         Sleep(500);
         armServo.SetDegree(170);
         Sleep(500);
         pivotTurn(*a);
     } while (*a++ != 0);
-    do coarseMoveInline(40, -8);
+    do coarseMoveInline(50, -8);
     while (RPS.Heading() < 0);
     armServo.SetDegree(60);
 }
 
 static void slideTicket() {
-    wheelServo.SetDegree(127);
-    turnTo(180);
-    coarseMoveInline(40, -11.5);
-    turnTo(270);
+    const float ref90 = point_from_prompt("Top of ramp").heading;
+    wheelServo.SetDegree(130);
+    turnTo(ref90+90);
+    coarseMoveInline(40, -12.25);
+    turnTo(ref90+180);
     armServo.SetDegree(0);
     coarseMoveInline(40, 7.3);
     pivotTurn(-45);
@@ -303,22 +308,20 @@ static void slideTicket() {
 }
 
 static void flipBurger() {
+    armServo.SetDegree(60);
+    wheelServo.SetDegree(45);
     Point x = point_from_prompt("Behind burger flip");
     x.y -= 5.f*std::sin(x.heading*M_PI/180.f);
     x.x -= 5.f*std::cos(x.heading*M_PI/180.f);
     moveTo(x);
     moveToWithTurn(point_from_prompt("Behind burger flip"));
     //turnTo(90);
-    int wheelServoVertical=57;
-    wheelServo.SetDegree(wheelServoVertical);
     coarseMoveInline(40, 4, 5);
-    for (int i = 1; i <= 10; ++i) {
-        wheelServo.SetDegree((153.f-60.f)*i/10.f+60.f);
-        Sleep(100);
-    }
+    Sleep(100);
+    wheelServo.SetDegree(153);
     Sleep(500);
-    wheelServo.SetDegree(wheelServoVertical);
-    Sleep(500);
+    wheelServo.SetDegree(60);
+    Sleep(200);
     coarseMoveInline(40, -4);
 }
 
@@ -359,14 +362,14 @@ static void pressJukeboxButton(float cdsNoLight) {
         LCD.WriteLine("Found a RED light");
 
     } else {
-        LCD.WriteLine("Found a BLUE light");
+        LCD.WriteLine("Found a BLUE light (or no light)");
     }
 
-    coarseMoveInline(40, isRed ? 5.5 : 3.5);
+    coarseMoveInline(40, isRed ? 5.5 : 2.5);
     // turn to face correct button
     turnTo(90);
-    coarseMoveInline(40,-8, 5);
-    coarseMoveInline(40,8);
+    coarseMoveInline(40,-INFINITY, 1.75);
+    coarseMoveInline(50,8);
 }
 
 int RunCourseModule::run()
@@ -390,8 +393,8 @@ int RunCourseModule::run()
     wheelServo.SetMin(690);
     wheelServo.SetMax(2400);
 
-    armServo.SetDegree(30);
-    wheelServo.SetDegree(57);
+    armServo.SetDegree(30); // formerly 30
+    wheelServo.SetDegree(130);
 
 
 
@@ -407,11 +410,13 @@ int RunCourseModule::run()
     float lightTime = TimeNow();
     while (getLight(cdsNoLight) != LC_RED && TimeNow() - lightTime < 30.f);
 
-    /* the original RPS-less sequence */
-    coarseMoveInline(40, 14.5);
+    coarseMoveInline(50, 14);
 
     // move to previously calibrated point
-    moveTo(point_from_prompt("Top of ramp"));
+    Point terrible_hack = point_from_prompt("Top of ramp");
+    terrible_hack.x += 5;
+    moveTo(terrible_hack);
+    armServo.SetDegree(50);
     moveTo(point_from_prompt("Top of ramp")); // The ramp consistently screws up positioning, so move to the home point *again* to account for that.
     turnTo(90);
 
@@ -421,15 +426,16 @@ int RunCourseModule::run()
     turnTo(230);
 
     // move forward and throw
-    coarseMoveInline(40, 4);
+    coarseMoveInline(50, 4);
     throwTray();
 
     // go back home
-    coarseMoveInline(40, -8);
+    coarseMoveInline(50, -8);
     //moveTo(point_from_prompt("Top of ramp"));
     //  _______________________END OF TRAY TASK
 
     // sliding ticket task begin
+    moveTo(point_from_prompt("Top of ramp"));
     moveTo(point_from_prompt("Top of ramp"));
     slideTicket();
     // sliding ticket task end
@@ -448,7 +454,7 @@ int RunCourseModule::run()
 
     // jukebox task begin
     Point x = point_from_prompt("On jukebox light");
-    x.y += 2;
+    //x.y += 2;
     x.x += 4;
     moveTo(x);
 
@@ -458,11 +464,12 @@ int RunCourseModule::run()
     // jukebox task end
 
     turnTo(180);
-    coarseMoveInline(40, -10);
-    turnTo(135);
+    coarseMoveInline(50, -10);
+    //turnTo(135);
+    pivotTurn(-45);
 
     LCD.WriteLine("Goodbye.");
-    coarseMoveInline(40, -1000000); // FULL FORCE!!!!!!!!!!!!
+    coarseMoveInline(50, -1000000); // FULL FORCE!!!!!!!!!!!!
 
     return 0;
 }
